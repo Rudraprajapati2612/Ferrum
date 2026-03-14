@@ -1,0 +1,15 @@
+[package]
+name = "ferrum"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "ferrum"
+path = "src/lib.rs"
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+
+[dependencies]
+# Phase 1 — pure std, no dependencies needed yet
