@@ -1,4 +1,3 @@
-use std::os::linux::raw::stat;
 
 use crate::{http::{request::Request, response::Response}, router::Router};
 
@@ -43,9 +42,9 @@ pub type Handler = fn(&mut Context);
 pub struct App {
     router: Router,
 }
- 
+  
 impl App {
-    /// Create a new Ferrum app
+    // Create a new Ferrum app
     pub fn new() -> Self {
         println!("⚙  Ferrum framework initialized");
         Self {
@@ -53,29 +52,30 @@ impl App {
         }
     }
  
-    /// Register a GET route
+    // Register a GET route
     pub fn get(&mut self, path: &str, handler: Handler) {
         self.router.add("GET", path, handler);
     }
  
-    /// Register a POST route
+    // Register a POST route
     pub fn post(&mut self, path: &str, handler: Handler) {
         self.router.add("POST", path, handler);
     }
  
-    /// Register a PUT route
+    // Register a PUT route
     pub fn put(&mut self, path: &str, handler: Handler) {
         self.router.add("PUT", path, handler);
     }
  
-    /// Register a DELETE route
+    // Register a DELETE route
     pub fn delete(&mut self, path: &str, handler: Handler) {
         self.router.add("DELETE", path, handler);
     }
  
-    /// Start the HTTP server on the given port
+    // Start the HTTP server on the given port
     pub fn listen(self, port: u16) {
         println!("🦀 Ferrum listening on http://127.0.0.1:{}", port);
         server::start(port, self.router);
     }
+    
 }
