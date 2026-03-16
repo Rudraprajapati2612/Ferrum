@@ -59,7 +59,7 @@ fn handle_connection(mut stream:TcpStream,router:&mut Router) {
         }  
     };
 
-     // print what was parsed - great for learning
+     
      println!("Method  -> {}", request.method.as_str());
      println!("Path    -> {}", request.path);
      if !request.query_params.is_empty() {
@@ -72,9 +72,9 @@ fn handle_connection(mut stream:TcpStream,router:&mut Router) {
          println!("Body    -> {}", body);
      }
 
-    // serialize response to the bytes 
+    
 
-   // Step 3: Dispatch to router
+   //  Dispatch to router
    let method_str = request.method.as_str().to_string();
    let path       = request.path.clone();
    let ctx        = Context::new(request);

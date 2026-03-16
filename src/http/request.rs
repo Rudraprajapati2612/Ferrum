@@ -112,7 +112,7 @@ impl Request{
 
 
    
-    // so if out header contain token then key is token so 
+    // so if our header contain token then key is token so 
    // in this it takes token as a input and it gives back a value that is presnt at that key 
     pub fn header(&self , name:&str) -> Option<&String>{
         self.headers.get(&name.to_lowercase())
@@ -175,7 +175,7 @@ pub fn parse_query_string(query : &str) -> HashMap<String,String>{
         if line.is_empty() {continue;}
 
         let mut parts = line.splitn(2, ':');
-        let key = parts.next().unwrap_or("").trim().to_string();
+        let key = parts.next().unwrap_or("").trim().to_lowercase();
         let value = parts.next().unwrap_or("").trim().to_string();
 
         if !key.is_empty(){
