@@ -74,7 +74,7 @@ fn handle_connection(mut stream:TcpStream,router:&mut Router) {
 
     
 
-   //  Dispatch to router
+   //  Dispatch to router ----> This will run the handler 
    let method_str = request.method.as_str().to_string();
    let path       = request.path.clone();
    let ctx        = Context::new(request);

@@ -27,10 +27,10 @@ impl Response{
 
     pub fn reason_phrases(status:u16) -> &'static str{
         match  status {
-            200 => "Ok",
+            200 => "OK",
             201 => "Created",
             204 => "No Content",
-            301 => "Moved Permantely",
+            301 => "Moved Permanently",
             302 => "Found",
             400 => "Bad Request",
             401 => "Unauthorized",
@@ -51,33 +51,41 @@ impl Response{
 
     pub fn to_bytes(&self) -> Vec<u8>{
 
-        let content_length = self.body.len();
+        let mut out = Vec::new();
+
+         
         
         // So http repsonse contain 
         //  this four major part
-        // STATUS LINE
-        // HEADERS
-        // (blank line)
-        // BODY
+        // STATUS LINE ---> HTTP/1.1 200 OK \r\n
+        // HEADERS ------> Content-Type : text/plain
+        // (blank line) --> \r\n
+        // BODY -> hello 
 
-        let status_line = format!("HTTP/1.1 {} {}",self.status,Self::reason_phrases(self.status));
+        let status_line = format!("HTTP/1.1 {} {}\r\n",self.status,Self::reason_phrases(self.status));
 
-        let mut headers_str = String::new();
+        // covnert the response into bytes
+        out.extend_from_slice(status_line.as_bytes());
 
-        for(key,vaule) in &self.headers {
-            headers_str.push_str(&format!("{}:{}\r\n",key,vaule));
-        }
+        //  parse headers and 
+       
+       for (key,value) in &self.headers {
+        let header_line = format!("{} : {}\r\n",key,value);
 
-        headers_str.push_str(&format!("Content-Length :{}\r\n",content_length));
+        out.extend_from_slice(header_line.as_bytes());
+       }
 
-        headers_str.push_str("\r\n");
+    //  Calculate Content length 
 
-        let mut bytes = Vec::new();
+     let content_length = format!("Content-Length: {}\r\n", self.body.len());
+     out.extend_from_slice(content_length.as_bytes());
 
-        bytes.extend_from_slice(status_line.as_bytes());
-        bytes.extend_from_slice(headers_str.as_bytes());
-        bytes.extend_from_slice(self.body.as_bytes());
-        
-        bytes
+    //  convert blank line to bytes 
+
+    out.extend_from_slice(b"\r\n");
+    // convert body to bytes
+    out.extend_from_slice(self.body.as_bytes()); 
+    
+    out  
     }
 }

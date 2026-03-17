@@ -1,5 +1,5 @@
 
-use crate::{http::{request::Request, response::Response}, router::Router};
+use crate::{http::{request::Request, response::{ Response}}, router::Router};
 
 mod server;
 mod router;
@@ -34,6 +34,35 @@ impl Context{
         self.response.headers.insert("Content-Type".to_string(), "application/json".to_string());
     }
     
+    // send Not found 
+    pub fn not_found(&mut self,message:&str){
+        self.json(404, &format!(r#"{{"error": "{}"}}"#,message));
+    }
+
+    // send bad request 
+    pub fn bad_request(&mut self,message:&str){
+        self.json(400, &format!(r#"{{"error": "{}"}}"#,message));
+    }
+    // send unauthorized 
+    pub fn unauthorized(&mut self, message: &str) {
+        self.json(401, &format!(r#"{{"error": "{}"}}"#, message));
+    }   
+    
+    // send internal error 
+    pub fn internal_error(&mut self, message: &str) {
+        self.json(500, &format!(r#"{{"error": "{}"}}"#, message));
+    }
+
+    pub fn redirect(&mut self,status:u16,location:&str){
+        self.response.status = status;
+        self.response.body = String::new();
+
+        self.response.headers.insert("Location".to_string(), location.to_string());
+    }
+
+    pub fn set_header(&mut self , key : &str,value :&str){
+        self.response.headers.insert(key.to_string(), value.to_string());
+    }
 }
 
 pub type Handler = fn(&mut Context);
