@@ -2,13 +2,13 @@ use std::io::{Read,Write};
 
 use std::net::{TcpListener,TcpStream};
 
-use crate::Context;
+use crate::{Context, Middleware};
 use crate::http::request::Request;
 use crate::router::Router;
 
 
 
-pub fn start(port:u16,mut router:Router){
+pub fn start(port:u16,mut router:Router,middlewares : Vec<Middleware>){
     let addr = format!("127.0.0.1:{}",port);
 
     let listner = TcpListener::bind(&addr).expect(&format!("failed to bind to {}",addr));
@@ -20,14 +20,14 @@ pub fn start(port:u16,mut router:Router){
  
     for stream in listner.incoming() {
         match stream {
-            Ok(stream) => handle_connection(stream,&mut router),
+            Ok(stream) => handle_connection(stream,&mut router,&middlewares),
             Err(e)=> eprintln!("Connection error {}",e)
         }
     }
 }
 
 
-fn handle_connection(mut stream:TcpStream,router:&mut Router) {
+fn handle_connection(mut stream:TcpStream,router:&mut Router,middlewares : &[Middleware]) {
     let mut buffer = [0u8;4096];
     //  so when data reads from the tcp stream it comes in bytes and this bytes read return size and it say till which 
     // index data is present 
@@ -78,14 +78,14 @@ fn handle_connection(mut stream:TcpStream,router:&mut Router) {
    let method_str = request.method.as_str().to_string();
    let path       = request.path.clone();
    let ctx        = Context::new(request);
-   let ctx        = router.dispatch(&method_str, &path, ctx);
+   let ctx        = router.dispatch(&method_str, &path, ctx,middlewares);
 
    let response_bytes = ctx.response.to_bytes();
    println!("Response -> {} ({} bytes)\n", ctx.response.status, response_bytes.len());
      
    
  
-    // ── Step 5: Write bytes back to TCP stream ───────────────────────
+    //  Write Bytes to TCP Stream  
     if let Err(e) = stream.write_all(&response_bytes) {
         eprintln!("Write error: {}", e);
     }

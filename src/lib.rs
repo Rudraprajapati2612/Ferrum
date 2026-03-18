@@ -7,6 +7,26 @@ mod router;
 pub mod http;
 
 
+
+
+//  Fnonce(&mut Context)
+// Fnonce take contex as a input and called only once 
+
+// dyn FnOnce(..) ---> it means something unknkown at compile time 
+
+//  Box<....> ---> Storing the function on the heap because size is unknown 
+//  'a is a lifetime that lives till middleware call
+
+pub type Next<'a> = Box<dyn FnOnce(&mut Context) + 'a>;  // in simple terms it take contex as a input and it run once and memory is allocate dynamically on heap  
+
+
+//  this is the function point which takes that takes &mut Contex and next as inpu and return nothing
+
+//  Function point  is used because it is easy to store and no heap allocation 
+pub type Middleware = fn(&mut Context,Next);
+
+pub type Handler = fn(&mut Context);
+
 pub struct Context{
     pub request : Request,
     pub response : Response,
@@ -69,11 +89,11 @@ impl Context{
     }
 }
 
-pub type Handler = fn(&mut Context);
 
 
 pub struct App {
     router: Router,
+    middlewares : Vec<Middleware>
 }
   
 impl App {
@@ -82,9 +102,13 @@ impl App {
         println!("⚙  Ferrum framework initialized");
         Self {
             router: Router::new(),
+            middlewares : Vec::new()
         }
     }
- 
+    
+    pub fn use_middleware(&mut self,middleware : Middleware){
+        self.middlewares.push(middleware);
+    }
     // Register a GET route
     pub fn get(&mut self, path: &str, handler: Handler) {
         self.router.add("GET", path, handler);
@@ -108,7 +132,41 @@ impl App {
     // Start the HTTP server on the given port
     pub fn listen(self, port: u16) {
         println!("🦀 Ferrum listening on http://127.0.0.1:{}", port);
-        server::start(port, self.router);
+        server::start(port, self.router,self.middlewares);
     }
     
+
+   
+}
+
+pub fn run_middleware_chain(
+    middlewares : &[Middleware],
+    handler: Handler,
+    ctx: &mut Context
+){
+    if middlewares.is_empty() {
+        handler(ctx);
+        return;
+    }
+
+    // take first middleware as a current and other as a remaning 
+    let current = middlewares[0];
+    let remanings = &middlewares[1..];
+
+
+    //  build the next function and 
+
+
+    // initialy it next is like this 
+    // run_middleware_chain([logger, auth, request_id], handler, ctx)
+    // then logger(ctx,next)  will run and 
+    // then logger function will execute
+    // run_middleware_chain([ auth, request_id], handler, ctx)
+    // auth(ctx,next) ---> will run 
+    // run_middleware_chain([request_id], handler, ctx) at last request id will run 
+    let next:Next  = Box::new(|ctx:&mut Context|{
+        run_middleware_chain(remanings,handler,ctx)
+    });
+    
+    current(ctx,next);
 }

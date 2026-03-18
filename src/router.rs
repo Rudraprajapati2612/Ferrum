@@ -1,7 +1,7 @@
 
 use std::{collections::HashMap};
 
-use crate::{Context, Handler, http::response::Response};
+use crate::{Context, Handler, Middleware, http::response::Response, run_middleware_chain};
 
 
 struct  Node{
@@ -96,16 +96,16 @@ impl Router {
                 }
             }
             // attach handler to the Corresponding  method 
-            current.handlers.insert(method.to_uppercase(), handler);
+            
 
         }
-
+        current.handlers.insert(method.to_uppercase(), handler);
         // traverst to the tree and find matching handelr 
         // collect the  params value in this along the way and 
         // return contex with params  populated + handler called 
         
     }
-    pub fn dispatch(&self,method : &str,path:&str,mut ctx:Context) -> Context{
+    pub fn dispatch(&self,method : &str,path:&str,mut ctx:Context,middlewares:&[Middleware]) -> Context{
         let segments = split_path(path); //seprate out path and stroed in vector
 
         match search(&self.root, &segments, 0, HashMap::new()) {
@@ -115,11 +115,13 @@ impl Router {
            Some((handler,params)) => {
             //  check for handler 
             match handler.get(&method.to_uppercase()) {
-                Some(h)=>{
+                Some(handler)=>{
                     // extract the request params 
                     ctx.request.params = params;
+                    // run middleware chain and then handler 
 
-                    h(&mut ctx);
+                    let handler = *handler;
+                    run_middleware_chain(middlewares, handler, &mut ctx);
                 }
                 None =>{
                     method_not_allowed(&mut ctx, method, path);

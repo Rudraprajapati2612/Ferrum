@@ -1,10 +1,63 @@
 
-use ferrum::{App, Context};
+use ferrum::{App, Context, Next};
+
+
+fn logger(ctx: &mut Context, next: Next) {
+    // BEFORE handler runs
+    println!(
+        "[LOG] --> {} {}",
+        ctx.request.method.as_str(),
+        ctx.request.path
+    );
+
+    // call next middleware (or handler if no more middlewares)
+    next(ctx);
+
+    // AFTER handler runs — response is now filled
+    println!("[LOG] <-- {}", ctx.response.status);
+}
+
+
+fn auth(ctx: &mut Context, next: Next) {
+    let token = ctx.request.header("authorization").cloned();
+
+    match token {
+        Some(t) => {
+            println!("[AUTH] token found: {}", t);
+            // valid — continue chain
+            next(ctx);
+        }
+        None => {
+            println!("[AUTH] no token — blocking request");
+            // stop chain — handler never runs
+            ctx.unauthorized("missing authorization header");
+        }
+    }
+}
+
+
+fn request_id(ctx: &mut Context, next: Next) {
+    // run handler first
+    next(ctx);
+
+    // AFTER handler — add header to response
+    ctx.response.headers.insert(
+        "X-Request-Id".to_string(),
+        "req-abc-123".to_string()
+    );
+}
+
 
 fn main() {
     let mut app = App::new();
 
-   
+    
+    // order matters — logger runs first, then auth, then request_id
+    app.use_middleware(logger);
+    app.use_middleware(auth);
+    app.use_middleware(request_id);
+
+    // ── public routes (no auth needed) ───────────────────────────
 
     app.get("/", |ctx: &mut Context| {
         ctx.send(200, "Welcome to Ferrum!");
@@ -14,55 +67,29 @@ fn main() {
         ctx.json(200, r#"{"status": "ok"}"#);
     });
 
-   
+    // ── routes with params ────────────────────────────────────────
 
-    // GET /users?page=1&limit=10
     app.get("/users", |ctx: &mut Context| {
         let page  = ctx.request.query("page").map(|s| s.as_str()).unwrap_or("1");
         let limit = ctx.request.query("limit").map(|s| s.as_str()).unwrap_or("10");
-        ctx.json(200, &format!(r#"{{"users": [], "page": {}, "limit": {}}}"#, page, limit));
+        ctx.json(200, &format!(r#"{{"users":[],"page":{},"limit":{}}}"#, page, limit));
     });
 
-    // POST /users
     app.post("/users", |ctx: &mut Context| {
         match &ctx.request.body.clone() {
-            Some(body) => ctx.json(201, &format!(r#"{{"created": true, "data": {}}}"#, body)),
+            Some(body) => ctx.json(201, &format!(r#"{{"created":true,"data":{}}}"#, body)),
             None       => ctx.bad_request("body is required"),
         }
     });
 
-    // Phase 4: LITERAL route — must register BEFORE the param route
-    // /users/profile will match this, NOT /users/:id
-    app.get("/users/profile", |ctx: &mut Context| {
-        ctx.json(200, r#"{"page": "profile", "tip": "literal beats param"}"#);
-    });
-
-    // Phase 4: PARAM route — matches /users/42, /users/abc, anything
     app.get("/users/:id", |ctx: &mut Context| {
         let id = ctx.request.param("id").map(|s| s.as_str()).unwrap_or("unknown");
-        ctx.json(200, &format!(r#"{{"id": "{}"}}"#, id));
+        ctx.json(200, &format!(r#"{{"id":"{}"}}"#, id));
     });
 
-    // Phase 4: DELETE with param
     app.delete("/users/:id", |ctx: &mut Context| {
         let id = ctx.request.param("id").map(|s| s.as_str()).unwrap_or("unknown");
-        ctx.json(200, &format!(r#"{{"deleted": true, "id": "{}"}}"#, id));
-    });
-
-    // Phase 4: multiple params in one route
-    app.get("/users/:userId/posts/:postId", |ctx: &mut Context| {
-        let user_id = ctx.request.param("userId").map(|s| s.as_str()).unwrap_or("");
-        let post_id = ctx.request.param("postId").map(|s| s.as_str()).unwrap_or("");
-        ctx.json(200, &format!(
-            r#"{{"userId": "{}", "postId": "{}"}}"#,
-            user_id, post_id
-        ));
-    });
-
-    // Phase 4: method not allowed test
-    // only GET registered — POST will return 405
-    app.get("/ping", |ctx: &mut Context| {
-        ctx.send(200, "pong");
+        ctx.json(200, &format!(r#"{{"deleted":true,"id":"{}"}}"#, id));
     });
 
     app.listen(8080);
