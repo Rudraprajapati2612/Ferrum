@@ -55,6 +55,7 @@ pub struct Request{
     pub version : String, //HTTP version 
     pub headers : HashMap<String,String>,
     pub query_params : HashMap<String,String>,
+    pub params : HashMap<String,String>,
     pub body : Option<String>,
     pub raw : Vec<u8> // raw bytes used for debuging 
 }
@@ -105,6 +106,7 @@ impl Request{
             version,
             headers,
             query_params,
+            params : HashMap::new(),
             body,
             raw: bytes.to_vec(),
         })
@@ -120,6 +122,10 @@ impl Request{
 
     pub fn query(&self, key: &str) -> Option<&String> {
         self.query_params.get(key)
+    }
+    
+    pub fn param(&self, key: &str) -> Option<&String> {
+        self.params.get(key)
     }
 }
 

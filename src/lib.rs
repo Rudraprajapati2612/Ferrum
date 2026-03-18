@@ -53,6 +53,10 @@ impl Context{
         self.json(500, &format!(r#"{{"error": "{}"}}"#, message));
     }
 
+    pub fn forbidden(&mut self, message: &str) {
+        self.json(403, &format!(r#"{{"error": "{}"}}"#, message));
+    }
+
     pub fn redirect(&mut self,status:u16,location:&str){
         self.response.status = status;
         self.response.body = String::new();
