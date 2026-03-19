@@ -1,92 +1,87 @@
-use std::io::{Read,Write};
-
-use std::net::{TcpListener,TcpStream};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::sync::Arc;
 
 use crate::{Context, Middleware};
 use crate::http::request::Request;
 use crate::router::Router;
 
+pub async fn start(port: u16, router: Router, middlewares: Vec<Middleware>) {
+    let addr = format!("127.0.0.1:{}", port);
 
-
-pub fn start(port:u16,mut router:Router,middlewares : Vec<Middleware>){
-    let addr = format!("127.0.0.1:{}",port);
-
-    let listner = TcpListener::bind(&addr).expect(&format!("failed to bind to {}",addr));
+    let listener = TcpListener::bind(&addr)
+        .await
+        .expect(&format!("Failed to bind to {}", addr));
 
     println!("─────────────────────────────────────");
     println!("  Ferrum running on http://{}", addr);
-    
     println!("─────────────────────────────────────");
- 
-    for stream in listner.incoming() {
-        match stream {
-            Ok(stream) => handle_connection(stream,&mut router,&middlewares),
-            Err(e)=> eprintln!("Connection error {}",e)
+
+    let router      = Arc::new(router);
+    let middlewares = Arc::new(middlewares);
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, _addr)) => {
+                let router      = Arc::clone(&router);
+                let middlewares = Arc::clone(&middlewares);
+
+                tokio::spawn(async move {
+                    handle_connection(stream, &router, &middlewares).await;
+                });
+            }
+            Err(e) => eprintln!("Accept error: {}", e),
         }
     }
 }
 
+async fn handle_connection(
+    mut stream:  TcpStream,
+    router:      &Router,
+    middlewares: &[Middleware],
+) {
+    // allocate buffer ONCE outside loop — reuse across requests
+    let mut buffer = vec![0u8; 4096];
 
-fn handle_connection(mut stream:TcpStream,router:&mut Router,middlewares : &[Middleware]) {
-    let mut buffer = [0u8;4096];
-    //  so when data reads from the tcp stream it comes in bytes and this bytes read return size and it say till which 
-    // index data is present 
-    let bytes_read = match stream.read(&mut buffer) {
-        Ok(n) => n,
-        Err(e) => { eprintln!("Read error :{}",e); return;}
-    };
+    loop {
+        // clear buffer from previous request
+        buffer.fill(0);
 
-    if bytes_read == 0 {
-         return;
-    }
+        let bytes_read = match stream.read(&mut buffer).await {
+            Ok(0) => break,   // client disconnected cleanly
+            Ok(n) => n,
+            Err(_) => break,  // connection reset — just exit silently
+        };
+        // eprintln!("DEBUG raw: {:?}", String::from_utf8_lossy(&buffer[..bytes_read]));
 
-    let raw_bytes = &buffer[..bytes_read];
+        let raw_bytes = &buffer[..bytes_read];
+        // convert raw bytes to Struct 
+        let request = match Request::from_bytes(raw_bytes) {
+            Ok(r)  => r,
+            Err(_) => {
+                let _ = stream.write_all(
+                    b"HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\n\r\nBad Request"
+                ).await;
+                break;
+            }
+        };
 
-    println!("\n ------ Incoming request ({} bytes)----",bytes_read); 
-    println!("{}", String::from_utf8_lossy(raw_bytes));
-    println!("---------------------------");
+        let should_close = request
+            .header("connection")
+            .map(|v| v.to_lowercase() == "close")
+            .unwrap_or(false);
 
-    // Parse Raw bytes ----> Request Struct 
+        let method_str = request.method.as_str().to_string();
+        let path       = request.path.clone();
+        let ctx        = Context::new(request);
+        let ctx        = router.dispatch(&method_str, &path, ctx, middlewares);
 
-    let request = match Request::from_bytes(raw_bytes){
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Parse error: {:?}", e);
-            let _ = stream.write_all(
-                b"HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\n\r\nBad Request"
-            );
-            return;
-        }  
-    };
+        let response_bytes = ctx.response.to_bytes();
 
-     
-     println!("Method  -> {}", request.method.as_str());
-     println!("Path    -> {}", request.path);
-     if !request.query_params.is_empty() {
-         println!("Query   -> {:?}", request.query_params);
-     }
-     if !request.headers.is_empty() {
-         println!("Headers -> {:?}", request.headers);
-     }
-     if let Some(body) = &request.body {
-         println!("Body    -> {}", body);
-     }
+        if let Err(_) = stream.write_all(&response_bytes).await {
+            break;
+        }
 
-    
-
-   //  Dispatch to router ----> This will run the handler 
-   let method_str = request.method.as_str().to_string();
-   let path       = request.path.clone();
-   let ctx        = Context::new(request);
-   let ctx        = router.dispatch(&method_str, &path, ctx,middlewares);
-
-   let response_bytes = ctx.response.to_bytes();
-   println!("Response -> {} ({} bytes)\n", ctx.response.status, response_bytes.len());
-     
-   
- 
-    //  Write Bytes to TCP Stream  
-    if let Err(e) = stream.write_all(&response_bytes) {
-        eprintln!("Write error: {}", e);
+        if should_close { break; }
     }
 }

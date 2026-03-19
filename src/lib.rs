@@ -130,9 +130,9 @@ impl App {
     }
  
     // Start the HTTP server on the given port
-    pub fn listen(self, port: u16) {
+    pub async fn listen(self, port: u16) {
         println!("🦀 Ferrum listening on http://127.0.0.1:{}", port);
-        server::start(port, self.router,self.middlewares);
+        server::start(port, self.router,self.middlewares).await;
     }
     
 

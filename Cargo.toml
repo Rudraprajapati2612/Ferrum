@@ -12,4 +12,4 @@ name = "basic"
 path = "examples/basic.rs"
 
 [dependencies]
-# Phase 1 — pure std, no dependencies needed yet
+tokio = { version = "1", features = ["full"] }

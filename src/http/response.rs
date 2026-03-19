@@ -70,8 +70,7 @@ impl Response{
         //  parse headers and 
        
        for (key,value) in &self.headers {
-        let header_line = format!("{} : {}\r\n",key,value);
-
+        let header_line = format!("{}: {}\r\n", key, value);  // ← remove space before :
         out.extend_from_slice(header_line.as_bytes());
        }
 
