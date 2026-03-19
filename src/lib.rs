@@ -1,4 +1,6 @@
 
+use std::{collections::HashMap, ops::Sub};
+
 use crate::{http::{request::Request, response::{ Response}}, router::Router};
 
 mod server;
@@ -90,7 +92,37 @@ impl Context{
 }
 
 
+pub struct SubRouter{
+    routes : Vec<(String,String,Handler)>
+}
 
+impl SubRouter{
+    pub fn new() -> Self {
+        Self { 
+            routes: Vec::new()
+        }
+    }
+
+    pub fn get(&mut self,path:&str,handler:Handler){
+        self.routes.push(("GET".to_string(),path.to_string(),handler));
+    }
+
+    pub fn post(&mut self, path: &str, handler: Handler) {
+        self.routes.push(("POST".to_string(), path.to_string(), handler));
+    }
+ 
+    pub fn put(&mut self, path: &str, handler: Handler) {
+        self.routes.push(("PUT".to_string(), path.to_string(), handler));
+    }
+ 
+    pub fn delete(&mut self, path: &str, handler: Handler) {
+        self.routes.push(("DELETE".to_string(), path.to_string(), handler));
+    }
+ 
+    pub fn patch(&mut self, path: &str, handler: Handler) {
+        self.routes.push(("PATCH".to_string(), path.to_string(), handler));
+    }
+}
 pub struct App {
     router: Router,
     middlewares : Vec<Middleware>
@@ -128,7 +160,25 @@ impl App {
     pub fn delete(&mut self, path: &str, handler: Handler) {
         self.router.add("DELETE", path, handler);
     }
+    
+    pub fn mount(&mut self,prefix:&str,sub_router:SubRouter){
+        println!("Mounting routes at prefix: {}", prefix);
  
+        for (method, path, handler) in sub_router.routes {
+            // combine prefix + sub path
+            let full_path = if path == "/" {
+            //    if in path contain "/" then it directly attach prefix to the path 
+                prefix.to_string()
+            } else {
+                
+                // → registers as "/api/v1/auth/login"
+                // else api/v1/auth is prefix and /login is path then path to the prefix 
+                format!("{}{}", prefix, path)
+            };
+ 
+            self.router.add(&method, &full_path, handler);
+        }
+    }
     // Start the HTTP server on the given port
     pub async fn listen(self, port: u16) {
         println!("🦀 Ferrum listening on http://127.0.0.1:{}", port);
@@ -138,6 +188,8 @@ impl App {
 
    
 }
+
+
 
 pub fn run_middleware_chain(
     middlewares : &[Middleware],
